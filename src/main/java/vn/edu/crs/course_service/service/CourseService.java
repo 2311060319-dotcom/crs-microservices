@@ -1,0 +1,78 @@
+package vn.edu.crs.course_service.service;
+
+import vn.edu.crs.course_service.dto.CourseDTO;
+import vn.edu.crs.course_service.entity.Course;
+import vn.edu.crs.course_service.repository.CourseRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class CourseService {
+    private final CourseRepository courseRepository;
+
+    public List<CourseDTO> getAll() {
+        return courseRepository.findAll()
+                .stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public CourseDTO getById(Long id) {
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Khong tim thay mon hoc id = " + id));
+        return toDTO(course);
+    }
+
+    public CourseDTO create(CourseDTO dto) {
+        // Nghiệp vụ 1: Không cho phép tạo trùng tên môn học
+        if (courseRepository.existsByTenMonHocIgnoreCase(dto.getTenMonHoc())) {
+            throw new IllegalArgumentException("Ten mon hoc da ton tai");
+        }
+
+        Course course = new Course();
+        course.setTenMonHoc(dto.getTenMonHoc());
+        course.setSoTinChi(dto.getSoTinChi());
+        course.setSoChoToiDa(dto.getSoChoToiDa());
+
+        // Nghiệp vụ 2: Khi tạo mới, số chỗ còn lại khởi tạo bằng số chỗ tối đa
+        course.setSoChoConLai(dto.getSoChoToiDa());
+
+        return toDTO(courseRepository.save(course));
+    }
+
+    public CourseDTO update(Long id, CourseDTO dto) {
+        Course course = courseRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Khong tim thay mon hoc id = " + id));
+
+        course.setTenMonHoc(dto.getTenMonHoc());
+        course.setSoTinChi(dto.getSoTinChi());
+        course.setSoChoToiDa(dto.getSoChoToiDa());
+
+        // Lưu ý: Không sửa đổi 'soChoConLai' ở đây. Nó chỉ được update qua các API reserve/release seat.
+
+        return toDTO(courseRepository.save(course));
+    }
+
+    public void delete(Long id) {
+        if (!courseRepository.existsById(id)) {
+            throw new NoSuchElementException("Khong tim thay mon hoc id = " + id);
+        }
+        courseRepository.deleteById(id);
+    }
+
+    // Hàm tiện ích để chuyển đổi từ Entity sang DTO
+    private CourseDTO toDTO(Course course) {
+        return new CourseDTO(
+                course.getId(),
+                course.getTenMonHoc(),
+                course.getSoTinChi(),
+                course.getSoChoToiDa(),
+                course.getSoChoConLai()
+        );
+    }
+}
